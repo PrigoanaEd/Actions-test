@@ -239,7 +239,7 @@ jobs:
         id: build_package_YTMusic
         run: |
           cd ${{ github.workspace }}/YTM
-          make clean package SIDELOADING=1
+          make package SIDELOADING=1
         env:
           THEOS: ${{ github.workspace }}/YTM/theos
 
