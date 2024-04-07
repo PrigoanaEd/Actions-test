@@ -1,38 +1,60 @@
-# I modified the github action from @arichornlover 's uYouEnhanced repo, but the original idea is by @ISnackable. Thanks to both of them!
-# https://github.com/ISnackable/YTCubePlus/blob/main/.github/workflows/Build.yml
-
-name: Build and Release YTMusicUltimate
+name: Build and Release Apps
 
 on:
   workflow_dispatch:
-    inputs: 
+    inputs:
+      sdk_version:
+        description: "iOS SDK version to be used during build"
+        default: "16.4"
+        required: true
+        type: string
+      uyou_version:
+        description: "The version of uYou"
+        default: "3.0.3"
+        required: true
+        type: string
+      decrypted_youtube_url:
+        description: "The direct URL to the decrypted YouTube ipa"
+        default: ""
+        required: true
+        type: string
+      bundle_id:
+        description: "Modify the bundle ID. Not recommended"
+        default: "com.google.ios.youtube"
+        required: true
+        type: string
+      app_name:
+        description: "Modify the name of the app on the Home Screen. Not recommended"
+        default: "YouTube"
+        required: true
+        type: string
       decrypted_youtube_music_url:
         description: "The direct URL to the decrypted YouTube Music ipa (Upload a decrypted .ipa file to Dropbox and input its URL here.)"
         default: "https://github.com/PrigoanaEd/test/raw/main/base/yt_music_base.ipa?download="
         required: true
-        type: string    
-  
+        type: string
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
-    name: Build YTMusicUltimate
+  build_uYou:
+    name: Build uYouEnhanced
     runs-on: macos-latest
     permissions:
       contents: write
 
     steps:
-      - name: Checkout Main
+      - name: Checkout uYou Main
         uses: actions/checkout@v4.1.1
         with:
-          path: main
+          path: YT
+          ref: main
           submodules: recursive
 
       - name: Install Dependencies
         run: brew install ldid dpkg make
-              
 
       - name: Set PATH environment variable
         run: echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH 
@@ -41,22 +63,142 @@ jobs:
         uses: actions/checkout@v4.1.1
         with:
           repository: theos/theos
-          ref: 4bcc52914e0eeca719288522938185decaa8a1cb
-          path: theos
+          ref: master
+          path: YT/theos
           submodules: recursive
       
       - name: SDK Caching
-        id: SDK
-        uses: actions/cache@v4.0.1
+        id: SDK_uYou
+        uses: actions/cache@v4.0.2
         env:
-          cache-name: iOS-16.2-SDK
+          cache-name: iOS-${{ inputs.sdk_version }}-SDK-uYou
         with:
-          path: theos/sdks/
+          path: YT/theos/sdks/
           key: ${{ env.cache-name }}
           restore-keys: ${{ env.cache-name }}
 
-      - name: Download iOS SDK
-        if: steps.SDK.outputs.cache-hit != 'true'
+      - name: Download iOS SDK for uYou
+        if: steps.SDK_uYou.outputs.cache-hit != 'true'
+        run: |
+          git clone --quiet -n --depth=1 --filter=tree:0 https://github.com/arichornlover/sdks/
+          cd sdks
+          git sparse-checkout set --no-cone iPhoneOS${{ inputs.sdk_version }}.sdk
+          git checkout
+          mv *.sdk $THEOS/sdks
+        env:
+          THEOS: ${{ github.workspace }}/YT/theos
+
+      - name: Setup Theos Jailed for uYou
+        uses: actions/checkout@v4.1.1
+        with:
+          repository: qnblackcat/theos-jailed
+          ref: master
+          path: YT/theos-jailed
+          submodules: recursive
+
+      - name: Install Theos Jailed for uYou
+        run: |
+          ./YT/theos-jailed/install
+        env:
+          THEOS: ${{ github.workspace }}/YT/theos
+
+      - name: Prepare YouTube iPA for uYou
+        id: prepare_youtube_uYou
+        run: |
+          wget "$YOUTUBE_URL" --no-verbose -O YT/YouTube.ipa
+          cd ${{ github.workspace }}/YT
+          mv YouTube.ipa YouTube.zip
+          unzip -q YouTube.zip
+          youtube_version=$(defaults read "$(pwd)/Payload/YouTube.app/Info" CFBundleVersion)
+          echo "==> YouTube v$youtube_version downloaded!"
+          sed -i '' "17s#.*#YOUTUBE_VERSION = ${youtube_version}#g" Makefile
+          echo "youtube_version=${youtube_version}" >> $GITHUB_OUTPUT
+        env:
+          THEOS: ${{ github.workspace }}/YT/theos
+          YOUTUBE_URL: ${{ inputs.decrypted_youtube_url }}
+
+      - name: Fix compiling & Build Package for uYou
+        id: build_package_uYou
+        run: |
+          cd ${{ github.workspace }}/YT
+          sed -i '' "27s#.*#BUNDLE_ID = ${{ env.BUNDLE_ID }}#g" Makefile                          # Modify the bundle ID
+          sed -i '' "26s#.*#DISPLAY_NAME = ${{ env.APP_NAME }}#g" Makefile                        # Modify the app name
+          sed -i '' "1s#.*#export TARGET = iphone:clang:${{ inputs.sdk_version }}:14.0#g" Makefile # Modify the SDK version
+          make package THEOS_PACKAGE_SCHEME=rootless IPA=Payload/YouTube.app FINALPACKAGE=1
+          echo "package=$(ls -t packages | head -n1)" >>$GITHUB_OUTPUT
+          echo -e "==> \033[1mSHASUM256: $(shasum -a 256 packages/*.ipa | cut -f1 -d' ')\033[0m"
+          echo -e "==> \033[1mBundle ID: ${{ env.BUNDLE_ID }}\033[0m"
+        env:
+          THEOS: ${{ github.workspace }}/YT/theos
+          UYOU_VERSION: ${{ inputs.uyou_version }}
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+          APP_NAME: ${{ inputs.app_name }}
+
+      - name: Upload Artifact for uYou
+        if: ${{ inputs.upload_artifact }}
+        uses: actions/upload-artifact@v4.3.1
+        env:
+          UYOU_VERSION: ${{ inputs.uyou_version }}
+          YOUTUBE_VERSION: ${{ steps.prepare_youtube_uYou.outputs.youtube_version }}
+        with:
+          name: uYouEnhanced_${{ env.YOUTUBE_VERSION }}_${{ env.UYOU_VERSION }}
+          path: ${{ github.workspace }}/YT/packages/${{ steps.build_package_uYou.outputs.package }}
+          if-no-files-found: error
+
+      - name: Create Release for uYou
+        id: create_release_uYou
+        uses: softprops/action-gh-release@v2.0.4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UYOU_VERSION: ${{ inputs.uyou_version }}
+          YOUTUBE_VERSION: ${{ steps.prepare_youtube_uYou.outputs.youtube_version }}
+          DRAFT: ${{ inputs.create_release }}
+        with:
+          tag_name: v${{ env.YOUTUBE_VERSION }}-${{ env.UYOU_VERSION }}-(${{ github.run_number }})
+          name: v${{ env.YOUTUBE_VERSION }}-${{ env.UYOU_VERSION }}-(${{ github.run_number }})
+          files: YT/packages/*.ipa
+          draft: ${{ env.DRAFT }}
+
+  build_YTMusic:
+    name: Build YTMusicUltimate
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout YTMusic Main
+        uses: actions/checkout@v4.1.1
+        with:
+          path: YTM
+          ref: main
+          submodules: recursive
+
+      - name: Install Dependencies for YTMusic
+        run: brew install ldid dpkg make
+
+      - name: Set PATH environment variable for YTMusic
+        run: echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH 
+
+      - name: Setup Theos for YTMusic
+        uses: actions/checkout@v4.1.1
+        with:
+          repository: theos/theos
+          ref: 4bcc52914e0eeca719288522938185decaa8a1cb
+          path: YTM/theos
+          submodules: recursive
+      
+      - name: SDK Caching for YTMusic
+        id: SDK_YTMusic
+        uses: actions/cache@v4.0.1
+        env:
+          cache-name: iOS-16.2-SDK-YTMusic
+        with:
+          path: YTM/theos/sdks/
+          key: ${{ env.cache-name }}
+          restore-keys: ${{ env.cache-name }}
+
+      - name: Download iOS SDK for YTMusic
+        if: steps.SDK_YTMusic.outputs.cache-hit != 'true'
         run: |
           git clone --quiet -n --depth=1 --filter=tree:0 https://github.com/arichorn/sdks/
           cd sdks
@@ -64,55 +206,54 @@ jobs:
           git checkout
           mv *.sdk $THEOS/sdks
         env:
-          THEOS: ${{ github.workspace }}/theos
+          THEOS: ${{ github.workspace }}/YTM/theos
 
-      - name: Setup Theos Jailed
+      - name: Setup Theos Jailed for YTMusic
         uses: actions/checkout@v4.1.1
         with:
           repository: qnblackcat/theos-jailed
           ref: master
-          path: theos-jailed
+          path: YTM/theos-jailed
           submodules: recursive
 
-      - name: Install Theos Jailed
+      - name: Install Theos Jailed for YTMusic
         run: |
-          ./theos-jailed/install
+          ./YTM/theos-jailed/install
         env:
-          THEOS: ${{ github.workspace }}/theos
+          THEOS: ${{ github.workspace }}/YTM/theos
           
-      - name: Install Azule
+      - name: Install Azule for YTMusic
         run: |
-          cd ${{ github.workspace }}/main
+          cd ${{ github.workspace }}/YTM
           git clone https://github.com/Al4ise/Azule 
           sudo ln -sf ~/Azule/azule /usr/local/bin/azule
 
-      - name: Prepare YouTube Music iPA
-        id: prepare_youtube_music
+      - name: Prepare YouTube Music iPA for YTMusic
+        id: prepare_youtube_music_YTMusic
         run: |
-          wget "$YOUTUBE_MUSIC_URL" --no-verbose -O main/YouTubeMusic.ipa
-
+          wget "$YOUTUBE_MUSIC_URL" --no-verbose -O YTM/YouTubeMusic.ipa
         env:
           YOUTUBE_MUSIC_URL: ${{ inputs.decrypted_youtube_music_url }}    
 
-      - name: Build Tweak for Sideloading
-        id: build_package
+      - name: Build Tweak for Sideloading for YTMusic
+        id: build_package_YTMusic
         run: |
-          cd ${{ github.workspace }}/main
+          cd ${{ github.workspace }}/YTM
           make clean package SIDELOADING=1
         env:
-          THEOS: ${{ github.workspace }}/theos
+          THEOS: ${{ github.workspace }}/YTM/theos
 
-      - name: Inject tweak into provided IPA
+      - name: Inject tweak into provided IPA for YTMusic
         run: |
           brew install coreutils
-          cd ${{ github.workspace }}/main/packages
+          cd ${{ github.workspace }}/YTM/packages
           tweakName=$(ls)
-          cd ${{ github.workspace }}/main
+          cd ${{ github.workspace }}/YTM
           ./Azule/azule -i $PWD/YouTubeMusic.ipa -o $PWD/packages/YTMusicUltimate.ipa -f $PWD/packages/$tweakName 
 
-      - name: Remove the Watch folder
+      - name: Remove the Watch folder for YTMusic
         run: |
-          cd ${{ github.workspace }}/main/packages
+          cd ${{ github.workspace }}/YTM/packages
           mv YTMusicUltimate.ipa YTMusicUltimate.zip
           unzip YTMusicUltimate.zip
           cd Payload/YoutubeMusic.app
@@ -121,11 +262,11 @@ jobs:
           zip -r YTMusicUltimate.ipa Payload
           rm -rf Payload    
 
-      - name: Create Release
-        id: create_release
+      - name: Create Release for YTMusic
+        id: create_release_YTMusic
         uses: softprops/action-gh-release@v2.0.1
         with:
           tag_name: YTMusicUltimate-v${{ github.run_number }}
           name: YTMusicUltimate-v${{ github.run_number }}
-          files: main/packages/*.ipa
+          files: YTM/packages/*.ipa
           draft: true
