@@ -1,0 +1,6 @@
+[submodule "uYouEnhanced"]
+	path = uYouEnhanced
+	url = https://github.com/PrigoanaEd/uYouEnhanced
+[submodule "YTMusicUltimate"]
+	path = YTMusicUltimate
+	url = https://github.com/PrigoanaEd/YTMusicUltimate
