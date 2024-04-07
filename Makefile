@@ -54,8 +54,8 @@ endif
 include $(THEOS_MAKE_PATH)/tweak.mk
 
 package:
-    @echo "Creating package..."
-    # Add commands to create the package here
+	@echo "Creating package..."
+	# Add commands to create the package here
 
 REMOVE_EXTENSIONS = 1
 CODESIGN_IPA = 0
@@ -66,11 +66,11 @@ UYOU_DYLIB = $(UYOU_PATH)/Library/MobileSubstrate/DynamicLibraries/uYou.dylib
 UYOU_BUNDLE = $(UYOU_PATH)/Library/Application\ Support/uYouBundle.bundle
 
 internal-clean::
-    @rm -rf $(UYOU_PATH)/*
+	@rm -rf $(UYOU_PATH)/*
 
 ifeq ($(JAILBROKEN),1)
 before-package::
-    @mkdir -p $(THEOS_STAGING_DIR)/Library/Application\ Support; cp -r Localizations/uYouPlus.bundle $(THEOS_STAGING_DIR)/Library/Application\ Support/
+	@mkdir -p $(THEOS_STAGING_DIR)/Library/Application\ Support; cp -r Localizations/uYouPlus.bundle $(THEOS_STAGING_DIR)/Library/Application\ Support/
 endif
 
 ifeq ($(ROOTLESS),1)
