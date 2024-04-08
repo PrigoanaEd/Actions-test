@@ -32,8 +32,6 @@ $(TWEAK_NAME)_EMBED_FRAMEWORKS = $(_THEOS_LOCAL_DATA_DIR)/$(THEOS_OBJ_DIR_NAME)/
 $(TWEAK_NAME)_EMBED_BUNDLES = $(wildcard Bundles/*.bundle)
 $(TWEAK_NAME)_EMBED_EXTENSIONS = $(wildcard Extensions/*.appex)
 
-include $(THEOS)/makefiles/common.mk
-
 ifndef YTM_VERSION
 YTM_VERSION = 2.0.6
 endif
