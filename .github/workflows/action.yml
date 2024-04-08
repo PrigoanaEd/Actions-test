@@ -3,7 +3,7 @@ description: 'Create a repository dispatch event'
 inputs:
   token:
     description: 'GITHUB_TOKEN or a `repo` scoped Personal Access Token (PAT)'
-    default: ${{ github.token }}
+    default: ${{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}}
   repository:
     description: 'The full name of the repository to send the dispatch.'
     default: ${{ github.repository }}
