@@ -1,0 +1,20 @@
+name: Trigger uYouEnhanced Build Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch name (e.g., main)'
+        required: true
+
+jobs:
+  trigger-uYouEnhanced-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger uYouEnhanced buildapp workflow
+        uses: peter-evans/repository-dispatch@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: PrigoanaEd/uYouEnhanced
+          workflow: buildapp.yml
+          ref: ${{ github.event.inputs.branch }}
