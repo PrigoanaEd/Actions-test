@@ -94,4 +94,9 @@ ifeq ($(SIDELOADING),1)
 $(TWEAK_NAME)_FILES += Sideloading.xm
 endif
 
-include makefiles/tweak.mk
+# Download the tweak.mk file from the URL
+tweak.mk:
+    curl -o tweak.mk https://raw.githubusercontent.com/theos/theos/master/makefiles/tweak.mk
+
+# Include the downloaded tweak.mk file
+include tweak.mk
