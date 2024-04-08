@@ -12,9 +12,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger uYouEnhanced buildapp workflow
-        uses: peter-evans/repository-dispatch@v3
+        uses: actions/github-script@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          repository: PrigoanaEd/uYouEnhanced
-          workflow: buildapp.yml
-          ref: ${{ github.event.inputs.branch }}
+          github-token: ${{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}}
+          script: |
+            const response = await octokit.request('POST /repos/PrigoanaEd/uYouEnhanced/dispatches', {
+              ref: '${{ github.event.inputs.branch }}',
+              event_type: 'trigger-build',
+              client_payload: {
+                branch: '${{ github.event.inputs.branch }}'
+              }
+            });
+            console.log(response.status);
