@@ -1,3 +1,6 @@
+# I modified the github action from @arichornlover 's uYouEnhanced repo, but the original idea is by @ISnackable. Thanks to both of them!
+# https://github.com/ISnackable/YTCubePlus/blob/main/.github/workflows/Build.yml
+
 name: Build and Release YTMusicUltimate
 
 on:
@@ -24,7 +27,7 @@ jobs:
       - name: Checkout Main
         uses: actions/checkout@v4.1.1
         with:
-          path: YT/main
+          path: main
           submodules: recursive
 
       - name: Install Dependencies
@@ -39,7 +42,7 @@ jobs:
         with:
           repository: theos/theos
           ref: 4bcc52914e0eeca719288522938185decaa8a1cb
-          path: YT/theos
+          path: theos
           submodules: recursive
       
       - name: SDK Caching
@@ -48,7 +51,7 @@ jobs:
         env:
           cache-name: iOS-16.2-SDK
         with:
-          path: YT/theos/sdks/
+          path: theos/sdks/
           key: ${{ env.cache-name }}
           restore-keys: ${{ env.cache-name }}
 
@@ -61,32 +64,32 @@ jobs:
           git checkout
           mv *.sdk $THEOS/sdks
         env:
-          THEOS: ${{ github.workspace }}/YT/theos
+          THEOS: ${{ github.workspace }}/theos
 
       - name: Setup Theos Jailed
         uses: actions/checkout@v4.1.1
         with:
           repository: qnblackcat/theos-jailed
           ref: master
-          path: YT/theos-jailed
+          path: theos-jailed
           submodules: recursive
 
       - name: Install Theos Jailed
         run: |
-          ./YT/theos-jailed/install
+          ./theos-jailed/install
         env:
-          THEOS: ${{ github.workspace }}/YT/theos
+          THEOS: ${{ github.workspace }}/theos
           
       - name: Install Azule
         run: |
-          cd ${{ github.workspace }}/YT/main
+          cd ${{ github.workspace }}/main
           git clone https://github.com/Al4ise/Azule 
           sudo ln -sf ~/Azule/azule /usr/local/bin/azule
 
       - name: Prepare YouTube Music iPA
         id: prepare_youtube_music
         run: |
-          wget "$YOUTUBE_MUSIC_URL" --no-verbose -O YT/main/YouTubeMusic.ipa
+          wget "$YOUTUBE_MUSIC_URL" --no-verbose -O main/YouTubeMusic.ipa
 
         env:
           YOUTUBE_MUSIC_URL: ${{ inputs.decrypted_youtube_music_url }}    
@@ -94,22 +97,22 @@ jobs:
       - name: Build Tweak for Sideloading
         id: build_package
         run: |
-          cd ${{ github.workspace }}/YT/main
+          cd ${{ github.workspace }}/main
           make clean package SIDELOADING=1
         env:
-          THEOS: ${{ github.workspace }}/YT/theos
+          THEOS: ${{ github.workspace }}/theos
 
       - name: Inject tweak into provided IPA
         run: |
           brew install coreutils
-          cd ${{ github.workspace }}/YT/main/packages
+          cd ${{ github.workspace }}/main/packages
           tweakName=$(ls)
-          cd ${{ github.workspace }}/YT/main
+          cd ${{ github.workspace }}/main
           ./Azule/azule -i $PWD/YouTubeMusic.ipa -o $PWD/packages/YTMusicUltimate.ipa -f $PWD/packages/$tweakName 
 
       - name: Remove the Watch folder
         run: |
-          cd ${{ github.workspace }}/YT/main/packages
+          cd ${{ github.workspace }}/main/packages
           mv YTMusicUltimate.ipa YTMusicUltimate.zip
           unzip YTMusicUltimate.zip
           cd Payload/YoutubeMusic.app
@@ -124,5 +127,5 @@ jobs:
         with:
           tag_name: YTMusicUltimate-v${{ github.run_number }}
           name: YTMusicUltimate-v${{ github.run_number }}
-          files: YT/main/packages/*.ipa
+          files: main/packages/*.ipa
           draft: true
