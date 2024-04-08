@@ -1,3 +1,26 @@
-              - name: Repository Dispatch
-                uses: peter-evans/repository-dispatch@v3.0.0
-            
+name: Trigger uYouEnhanced Build Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch name (e.g., main)'
+        required: true
+
+jobs:
+  trigger-uYouEnhanced-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger uYouEnhanced buildapp workflow
+        uses: actions/github-script@v5
+        with:
+          github-token: ${{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}}
+          script: |
+            const response = await octokit.request('POST /repos/PrigoanaEd/uYouEnhanced/dispatches', {
+              ref: '${{ github.event.inputs.branch }}',
+              event_type: 'trigger-build',
+              client_payload: {
+                branch: '${{ github.event.inputs.branch }}'
+              }
+            });
+            console.log(response.status);
